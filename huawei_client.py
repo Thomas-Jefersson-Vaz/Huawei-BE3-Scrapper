@@ -12,6 +12,7 @@ https://github.com/vmakeev/huawei_mesh_router
 """
 
 import asyncio
+import ipaddress
 import json
 import logging
 import re
@@ -22,6 +23,22 @@ import aiohttp
 from crypto import generate_nonce, get_client_proof
 
 logger = logging.getLogger(__name__)
+
+
+def is_private_ip(ip_str: str) -> bool:
+    """Check if an IP string is a private, loopback, or CGNAT IP address."""
+    if not ip_str:
+        return True
+    try:
+        ip = ipaddress.ip_address(ip_str.strip())
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+            return True
+        # Check CGNAT subnet 100.64.0.0/10
+        if ip in ipaddress.ip_network("100.64.0.0/10"):
+            return True
+        return False
+    except ValueError:
+        return True
 
 # --- Constants ---
 SESSION_COOKIE = "SessionID_R3"
@@ -575,6 +592,20 @@ class HuaweiClient:
                         devices.extend(self._extract_devices_from_topology(dev))
         return devices
 
+    async def _get_public_ip_fallback(self) -> str:
+        """Fetch true public IP from external service if router API returns private/CGNAT/empty IP."""
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as session:
+                async with session.get("https://api.ipify.org?format=json") as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        ip = data.get("ip", "").strip()
+                        if ip and not is_private_ip(ip):
+                            return ip
+        except Exception as e:
+            logger.debug("Public IP fallback lookup failed: %s", e)
+        return ""
+
     async def get_wan_info(self) -> Dict[str, Any]:
         """
         Get WAN connection status, external IP, and bandwidth.
@@ -599,6 +630,13 @@ class HuaweiClient:
                 break
 
         external_ip = _extract_ip(detect_data) or _extract_ip(rate_data)
+
+        # Fallback to external public IP lookup if router reported private/CGNAT or empty IP
+        if is_private_ip(external_ip):
+            logger.debug("Router returned private/CGNAT/empty WAN IP (%s). Fetching real public IP...", external_ip)
+            public_ip = await self._get_public_ip_fallback()
+            if public_ip:
+                external_ip = public_ip
 
         connected = False
         if isinstance(detect_data, dict):
