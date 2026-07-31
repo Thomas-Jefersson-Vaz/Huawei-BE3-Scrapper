@@ -69,8 +69,8 @@ async def scrape_cycle(client: HuaweiClient, pusher: ZabbixPusher) -> bool:
             client.get_connected_devices(),
         )
 
-        # Count online devices
-        online = [d for d in devices if d.get("Active") or d.get("IsOnline")]
+        # Stabilized active devices count
+        online = pusher.get_active_devices(devices)
 
         logger.info(
             "📡 Scraped: router=%s | WAN=%s (%s) | ↑%.1f KB/s ↓%.1f KB/s | %d devices online",

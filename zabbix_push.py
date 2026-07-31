@@ -8,6 +8,7 @@ automatic item creation in Zabbix.
 
 import json
 import logging
+import time
 from typing import Any, Dict, List
 
 from pyzabbix import ZabbixMetric, ZabbixSender, ZabbixResponse
@@ -83,20 +84,49 @@ class ZabbixPusher:
     Pushes scraped router data to Zabbix via the Trapper protocol.
 
     All metrics are batched per scrape cycle and sent in a single
-    ZabbixSender.send() call for efficiency.
+    ZabbixSender.send() call for efficiency. Includes a device TTL cache
+    to debounce transient Wi-Fi sleep and API drops.
     """
 
-    def __init__(self, server: str, port: int, host_name: str):
+    def __init__(self, server: str, port: int, host_name: str, device_ttl: int = 120):
         """
         Args:
             server: Zabbix server IP or hostname.
             port: Zabbix trapper port (default 10051).
             host_name: The technical host name in Zabbix (must match exactly).
+            device_ttl: Seconds to keep an active device in cache during transient sleep/drops (default 120s).
         """
         self._server = server
         self._port = port
         self._host = host_name
         self._sender = ZabbixSender(zabbix_server=server, zabbix_port=port)
+        self._device_cache: Dict[str, Dict[str, Any]] = {}
+        self._device_ttl = device_ttl
+
+    def get_active_devices(self, raw_devices: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Return stabilized active devices list using TTL state caching.
+        Smooths out 1-2 scrape cycle Wi-Fi power saving sleep or API drops.
+        """
+        now = time.time()
+
+        # Update cache with currently active devices reported by API
+        current_active = [d for d in raw_devices if _is_device_online(d)]
+        for dev in current_active:
+            mac = (dev.get("MACAddress") or dev.get("MacAddress") or dev.get("mac") or "").upper().replace(":", "").replace("-", "")
+            key = mac or str(dev.get("IPAddress") or dev.get("HostName") or "")
+            if key:
+                self._device_cache[key] = {
+                    "data": dev,
+                    "last_seen": now
+                }
+
+        # Expire devices not seen for longer than device_ttl
+        expired_keys = [k for k, info in self._device_cache.items() if now - info["last_seen"] > self._device_ttl]
+        for k in expired_keys:
+            del self._device_cache[k]
+
+        return [info["data"] for info in self._device_cache.values()]
 
     def push_all(
         self,
@@ -137,8 +167,8 @@ class ZabbixPusher:
             self._metric("huawei.wan.download_rate", wan_info.get("download_rate", 0)),
         ])
 
-        # ── Device Count ──────────────────────────────────────────────
-        online_devices = [d for d in devices if _is_device_online(d)]
+        # ── Device Count (Stabilized via TTL Cache) ───────────────────
+        online_devices = self.get_active_devices(devices)
         metrics.append(self._metric("huawei.devices.count", len(online_devices)))
 
         # ── LLD Discovery for Devices ─────────────────────────────────
