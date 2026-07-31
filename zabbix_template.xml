@@ -1,0 +1,407 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<zabbix_export>
+    <version>7.0</version>
+    <templates>
+        <template>
+            <uuid>c7dfed48713b43c383ae9c91a492c60f</uuid>
+            <template>Huawei WiFi BE3 Scraper</template>
+            <name>Huawei WiFi BE3 Scraper</name>
+            <description>Template for monitoring Huawei WiFi BE3 (WS8100) routers via the HuaweiBE3Scrapper Python agent. All items are Zabbix Trapper type, receiving data pushed by the scraper container.</description>
+            <groups>
+                <group>
+                    <name>Templates/Network devices</name>
+                </group>
+            </groups>
+            <items>
+                <!-- Router Info Items -->
+                <item>
+                    <uuid>a0c2f531abc6449ca895977c34c48934</uuid>
+                    <name>Router: Name</name>
+                    <type>TRAP</type>
+                    <key>huawei.router.name</key>
+                    <delay>0</delay>
+                    <trends>0</trends>
+                    <value_type>CHAR</value_type>
+                    <description>Friendly name of the router.</description>
+                    <tags>
+                        <tag>
+                            <tag>component</tag>
+                            <value>system</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>ba0c2240e71f4b14886312a443e1f710</uuid>
+                    <name>Router: Model</name>
+                    <type>TRAP</type>
+                    <key>huawei.router.model</key>
+                    <delay>0</delay>
+                    <trends>0</trends>
+                    <value_type>CHAR</value_type>
+                    <description>Hardware model name (e.g., WiFi BE3).</description>
+                    <tags>
+                        <tag>
+                            <tag>component</tag>
+                            <value>system</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>4d7d1e8628fb417abd297d1701e790bd</uuid>
+                    <name>Router: Firmware Version</name>
+                    <type>TRAP</type>
+                    <key>huawei.router.firmware</key>
+                    <delay>0</delay>
+                    <trends>0</trends>
+                    <value_type>CHAR</value_type>
+                    <description>Current software/firmware version.</description>
+                    <tags>
+                        <tag>
+                            <tag>component</tag>
+                            <value>system</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>759416c26ddf43ebae4690ed6d7ecb53</uuid>
+                    <name>Router: Hardware Version</name>
+                    <type>TRAP</type>
+                    <key>huawei.router.hardware</key>
+                    <delay>0</delay>
+                    <trends>0</trends>
+                    <value_type>CHAR</value_type>
+                    <description>Hardware revision string.</description>
+                    <tags>
+                        <tag>
+                            <tag>component</tag>
+                            <value>system</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>bfefe7f832a24b109f598ad79eb4fc07</uuid>
+                    <name>Router: HarmonyOS Version</name>
+                    <type>TRAP</type>
+                    <key>huawei.router.harmonyos</key>
+                    <delay>0</delay>
+                    <trends>0</trends>
+                    <value_type>CHAR</value_type>
+                    <description>HarmonyOS firmware version.</description>
+                    <tags>
+                        <tag>
+                            <tag>component</tag>
+                            <value>system</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>8bd0c9949b13430fb98375959a072351</uuid>
+                    <name>Router: Serial Number</name>
+                    <type>TRAP</type>
+                    <key>huawei.router.serial</key>
+                    <delay>0</delay>
+                    <trends>0</trends>
+                    <value_type>CHAR</value_type>
+                    <description>Router serial number.</description>
+                    <tags>
+                        <tag>
+                            <tag>component</tag>
+                            <value>system</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>d9a6fe5a750d41468a12c01242d05450</uuid>
+                    <name>Router: Uptime</name>
+                    <type>TRAP</type>
+                    <key>huawei.router.uptime</key>
+                    <delay>0</delay>
+                    <value_type>UNSIGNED</value_type>
+                    <units>s</units>
+                    <description>Router uptime in seconds since last boot.</description>
+                    <tags>
+                        <tag>
+                            <tag>component</tag>
+                            <value>system</value>
+                        </tag>
+                    </tags>
+                </item>
+
+                <!-- WAN Items -->
+                <item>
+                    <uuid>3e676b227f7b4947b145aaa3d3077424</uuid>
+                    <name>WAN: Connection Status</name>
+                    <type>TRAP</type>
+                    <key>huawei.wan.status</key>
+                    <delay>0</delay>
+                    <value_type>UNSIGNED</value_type>
+                    <description>WAN connection status. 1 = connected, 0 = disconnected.</description>
+                    <valuemap>
+                        <name>WAN Connection Status</name>
+                    </valuemap>
+                    <tags>
+                        <tag>
+                            <tag>component</tag>
+                            <value>network</value>
+                        </tag>
+                    </tags>
+                    <triggers>
+                        <trigger>
+                            <uuid>bd23be1178c1480c96090fd9b0120f0f</uuid>
+                            <expression>last(/Huawei WiFi BE3 Scraper/huawei.wan.status)=0</expression>
+                            <name>WAN connection is down</name>
+                            <priority>HIGH</priority>
+                            <description>The router's WAN connection is currently disconnected.</description>
+                        </trigger>
+                    </triggers>
+                </item>
+                <item>
+                    <uuid>0d43418b613f41f79ff421237647b29d</uuid>
+                    <name>WAN: External IP</name>
+                    <type>TRAP</type>
+                    <key>huawei.wan.external_ip</key>
+                    <delay>0</delay>
+                    <trends>0</trends>
+                    <value_type>CHAR</value_type>
+                    <description>External (public) IP address assigned by ISP.</description>
+                    <tags>
+                        <tag>
+                            <tag>component</tag>
+                            <value>network</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>99a47aa5d4cb4194baef77e3a9c3d740</uuid>
+                    <name>WAN: Connection Uptime</name>
+                    <type>TRAP</type>
+                    <key>huawei.wan.uptime</key>
+                    <delay>0</delay>
+                    <value_type>UNSIGNED</value_type>
+                    <units>s</units>
+                    <description>WAN connection uptime in seconds.</description>
+                    <tags>
+                        <tag>
+                            <tag>component</tag>
+                            <value>network</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>d3434aceb1c24c2393f813b5a9b78cbd</uuid>
+                    <name>WAN: Upload Rate</name>
+                    <type>TRAP</type>
+                    <key>huawei.wan.upload_rate</key>
+                    <delay>0</delay>
+                    <value_type>UNSIGNED</value_type>
+                    <units>Bps</units>
+                    <description>Current WAN upload bandwidth in bytes per second.</description>
+                    <preprocessing>
+                        <step>
+                            <type>DISCARD_UNCHANGED_HEARTBEAT</type>
+                            <parameters>
+                                <parameter>10m</parameter>
+                            </parameters>
+                        </step>
+                    </preprocessing>
+                    <tags>
+                        <tag>
+                            <tag>component</tag>
+                            <value>network</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>8366c3e4c1e74d6c978e975dc6742ed4</uuid>
+                    <name>WAN: Download Rate</name>
+                    <type>TRAP</type>
+                    <key>huawei.wan.download_rate</key>
+                    <delay>0</delay>
+                    <value_type>UNSIGNED</value_type>
+                    <units>Bps</units>
+                    <description>Current WAN download bandwidth in bytes per second.</description>
+                    <preprocessing>
+                        <step>
+                            <type>DISCARD_UNCHANGED_HEARTBEAT</type>
+                            <parameters>
+                                <parameter>10m</parameter>
+                            </parameters>
+                        </step>
+                    </preprocessing>
+                    <tags>
+                        <tag>
+                            <tag>component</tag>
+                            <value>network</value>
+                        </tag>
+                    </tags>
+                </item>
+
+                <!-- Device Count -->
+                <item>
+                    <uuid>d6a28d209cd9445a98e900a089263e98</uuid>
+                    <name>Devices: Total Connected</name>
+                    <type>TRAP</type>
+                    <key>huawei.devices.count</key>
+                    <delay>0</delay>
+                    <value_type>UNSIGNED</value_type>
+                    <description>Total number of devices currently connected to the router.</description>
+                    <tags>
+                        <tag>
+                            <tag>component</tag>
+                            <value>devices</value>
+                        </tag>
+                    </tags>
+                </item>
+            </items>
+
+            <!-- Low-Level Discovery: Connected Devices -->
+            <discovery_rules>
+                <discovery_rule>
+                    <uuid>c3924e509db5439a99792eb01208f80f</uuid>
+                    <name>Connected Devices Discovery</name>
+                    <type>TRAP</type>
+                    <key>huawei.devices.discovery</key>
+                    <delay>0</delay>
+                    <lifetime>7d</lifetime>
+                    <description>Auto-discovers connected devices and creates per-device monitoring items.</description>
+                    <item_prototypes>
+                        <item_prototype>
+                            <uuid>c015936b46db4706bf0df50e54da92b6</uuid>
+                            <name>Device [{#HOSTNAME}]: IP Address</name>
+                            <type>TRAP</type>
+                            <key>huawei.device.ip[{#MAC}]</key>
+                            <delay>0</delay>
+                            <trends>0</trends>
+                            <value_type>CHAR</value_type>
+                            <description>IP address of device {#HOSTNAME} ({#MAC}).</description>
+                            <tags>
+                                <tag>
+                                    <tag>component</tag>
+                                    <value>device</value>
+                                </tag>
+                                <tag>
+                                    <tag>device</tag>
+                                    <value>{#HOSTNAME}</value>
+                                </tag>
+                            </tags>
+                        </item_prototype>
+                        <item_prototype>
+                            <uuid>c13a11044a554a79990edb4c9aa1bca8</uuid>
+                            <name>Device [{#HOSTNAME}]: Hostname</name>
+                            <type>TRAP</type>
+                            <key>huawei.device.hostname[{#MAC}]</key>
+                            <delay>0</delay>
+                            <trends>0</trends>
+                            <value_type>CHAR</value_type>
+                            <description>Hostname of device {#HOSTNAME} ({#MAC}).</description>
+                            <tags>
+                                <tag>
+                                    <tag>component</tag>
+                                    <value>device</value>
+                                </tag>
+                                <tag>
+                                    <tag>device</tag>
+                                    <value>{#HOSTNAME}</value>
+                                </tag>
+                            </tags>
+                        </item_prototype>
+                        <item_prototype>
+                            <uuid>e4b81c2901ad47f5b89c3d4e5f6a7b8c</uuid>
+                            <name>Device [{#HOSTNAME}]: Connection Type</name>
+                            <type>TRAP</type>
+                            <key>huawei.device.access_type[{#MAC}]</key>
+                            <delay>0</delay>
+                            <trends>0</trends>
+                            <value_type>CHAR</value_type>
+                            <description>Connection type / WiFi band of device {#HOSTNAME} ({#MAC}) (2.4 GHz, 5 GHz, Ethernet).</description>
+                            <tags>
+                                <tag>
+                                    <tag>component</tag>
+                                    <value>device</value>
+                                </tag>
+                                <tag>
+                                    <tag>device</tag>
+                                    <value>{#HOSTNAME}</value>
+                                </tag>
+                            </tags>
+                        </item_prototype>
+                        <item_prototype>
+                            <uuid>6f7bcfa49cea474fafa5deb41b27ba15</uuid>
+                            <name>Device [{#HOSTNAME}]: Upload Rate</name>
+                            <type>TRAP</type>
+                            <key>huawei.device.upload[{#MAC}]</key>
+                            <delay>0</delay>
+                            <value_type>UNSIGNED</value_type>
+                            <units>Bps</units>
+                            <description>Upload rate of device {#HOSTNAME} ({#MAC}).</description>
+                            <preprocessing>
+                                <step>
+                                    <type>DISCARD_UNCHANGED_HEARTBEAT</type>
+                                    <parameters>
+                                        <parameter>10m</parameter>
+                                    </parameters>
+                                </step>
+                            </preprocessing>
+                            <tags>
+                                <tag>
+                                    <tag>component</tag>
+                                    <value>device</value>
+                                </tag>
+                                <tag>
+                                    <tag>device</tag>
+                                    <value>{#HOSTNAME}</value>
+                                </tag>
+                            </tags>
+                        </item_prototype>
+                        <item_prototype>
+                            <uuid>d0f1efdeb19c479b97c3493de9495354</uuid>
+                            <name>Device [{#HOSTNAME}]: Download Rate</name>
+                            <type>TRAP</type>
+                            <key>huawei.device.download[{#MAC}]</key>
+                            <delay>0</delay>
+                            <value_type>UNSIGNED</value_type>
+                            <units>Bps</units>
+                            <description>Download rate of device {#HOSTNAME} ({#MAC}).</description>
+                            <preprocessing>
+                                <step>
+                                    <type>DISCARD_UNCHANGED_HEARTBEAT</type>
+                                    <parameters>
+                                        <parameter>10m</parameter>
+                                    </parameters>
+                                </step>
+                            </preprocessing>
+                            <tags>
+                                <tag>
+                                    <tag>component</tag>
+                                    <value>device</value>
+                                </tag>
+                                <tag>
+                                    <tag>device</tag>
+                                    <value>{#HOSTNAME}</value>
+                                </tag>
+                            </tags>
+                        </item_prototype>
+                    </item_prototypes>
+                </discovery_rule>
+            </discovery_rules>
+
+            <!-- Value Maps -->
+            <valuemaps>
+                <valuemap>
+                    <uuid>c7d2e1f0a3b4459c8d6e7f0a1b2c3d4e</uuid>
+                    <name>WAN Connection Status</name>
+                    <mappings>
+                        <mapping>
+                            <value>0</value>
+                            <newvalue>Disconnected</newvalue>
+                        </mapping>
+                        <mapping>
+                            <value>1</value>
+                            <newvalue>Connected</newvalue>
+                        </mapping>
+                    </mappings>
+                </valuemap>
+            </valuemaps>
+        </template>
+    </templates>
+</zabbix_export>

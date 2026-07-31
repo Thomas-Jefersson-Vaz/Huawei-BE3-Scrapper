@@ -1,0 +1,16 @@
+services:
+  huawei-scraper:
+    build: .
+    container_name: huawei-be3-scraper
+    env_file: .env
+    # network_mode: host is required so the container can reach both
+    # the router (e.g., 192.168.3.1) and the Zabbix server on your LAN.
+    # If your Zabbix server is on a different network, you can remove this
+    # and use the default bridge network instead.
+    network_mode: host
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
