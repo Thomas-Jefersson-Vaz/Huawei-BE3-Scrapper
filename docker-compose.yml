@@ -1,6 +1,6 @@
 services:
   huawei-scraper:
-    build: .
+    image: ghcr.io/thomas-jefersson-vaz/huawei-be3-scraper:latest
     container_name: huawei-be3-scraper
     # network_mode: host is required so the container can reach both
     # the router (e.g., 192.168.3.1) and the Zabbix server on your LAN.
