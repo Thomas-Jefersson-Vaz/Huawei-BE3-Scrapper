@@ -477,13 +477,13 @@ class HuaweiClient:
         Tries alternative endpoints if the default one 404s.
         If all direct endpoints 404, extracts devices from topology.
         """
-        # If we previously found a working endpoint, try it first
         endpoints_to_try = (
             [self._working_host_info_endpoint] + HOST_INFO_ENDPOINTS
             if self._working_host_info_endpoint
             else HOST_INFO_ENDPOINTS
         )
 
+        raw_devices = []
         for endpoint in endpoints_to_try:
             if not endpoint:
                 continue
@@ -492,14 +492,40 @@ class HuaweiClient:
                 self._working_host_info_endpoint = endpoint
                 logger.debug("Connected devices endpoint found: %s", endpoint)
                 if isinstance(data, list):
-                    return data
-                elif isinstance(data, dict) and "HostList" in data:
-                    return data["HostList"]
+                    raw_devices = data
+                    break
+                elif isinstance(data, dict):
+                    for k in [
+                        "HostList", "host_list", "hosts", "devices",
+                        "DeviceList", "device_list", "HostInfo", "host_info", "data"
+                    ]:
+                        if k in data and isinstance(data[k], list):
+                            raw_devices = data[k]
+                            break
+                    if raw_devices:
+                        break
 
-        # Fallback: Extract connected devices from topology tree
-        logger.debug("Direct device endpoints 404'd, extracting from topology tree")
-        topology = await self.get_device_topology()
-        return self._extract_devices_from_topology(topology)
+        if not raw_devices:
+            # Fallback: Extract connected devices from topology tree
+            logger.debug("Direct device endpoints 404'd, extracting from topology tree")
+            topology = await self.get_device_topology()
+            raw_devices = self._extract_devices_from_topology(topology)
+
+        # Deduplicate devices by MAC / IP
+        seen_macs = set()
+        unique_devices = []
+        for d in raw_devices:
+            if not isinstance(d, dict):
+                continue
+            mac = (d.get("MACAddress") or d.get("MacAddress") or d.get("mac") or "").upper().replace(":", "").replace("-", "")
+            if mac:
+                if mac in seen_macs:
+                    continue
+                seen_macs.add(mac)
+            unique_devices.append(d)
+
+        logger.debug("Found %d total unique devices from API", len(unique_devices))
+        return unique_devices
 
     def _extract_devices_from_topology(self, node: Any) -> List[Dict[str, Any]]:
         """Recursively extract devices from mesh topology JSON."""
@@ -508,20 +534,45 @@ class HuaweiClient:
             for item in node:
                 devices.extend(self._extract_devices_from_topology(item))
         elif isinstance(node, dict):
-            connected = node.get("ConnectedDevices", [])
-            for dev in connected:
-                if isinstance(dev, dict):
-                    devices.append({
-                        "MACAddress": dev.get("MACAddress", ""),
-                        "IPAddress": dev.get("IPAddress", ""),
-                        "HostName": dev.get("HostName", dev.get("DeviceName", "Unknown")),
-                        "AccessType": dev.get("AccessType", dev.get("ConnectType", dev.get("PortType", dev.get("Band", "")))),
-                        "UpRate": dev.get("UpSpeed", dev.get("UpRate", 0)),
-                        "DownRate": dev.get("DownSpeed", dev.get("DownRate", 0)),
-                        "IsOnline": True,
-                    })
-                    # Recurse for nested devices
-                    devices.extend(self._extract_devices_from_topology(dev))
+            # Check if this node itself represents a connected host/device
+            mac = (
+                node.get("MACAddress")
+                or node.get("MacAddress")
+                or node.get("mac")
+                or node.get("MAC")
+                or ""
+            )
+            ip = (
+                node.get("IPAddress")
+                or node.get("IpAddress")
+                or node.get("ip")
+                or node.get("IP")
+                or ""
+            )
+
+            # Avoid adding the router itself as a client device if marked as Master/Gateway
+            role = str(node.get("Role", node.get("DeviceType", ""))).lower()
+            if (mac or ip) and "gateway" not in role and "master" not in role:
+                devices.append({
+                    "MACAddress": mac,
+                    "IPAddress": ip,
+                    "HostName": node.get("HostName", node.get("DeviceName", node.get("Name", "Unknown"))),
+                    "AccessType": node.get("AccessType", node.get("ConnectType", node.get("PortType", node.get("Band", "")))),
+                    "UpRate": node.get("UpSpeed", node.get("UpRate", 0)),
+                    "DownRate": node.get("DownSpeed", node.get("DownRate", 0)),
+                    "IsOnline": True,
+                })
+
+            # Check all possible child list keys in topology nodes
+            for key in [
+                "ConnectedDevices", "connected_devices", "Hosts", "HostList",
+                "host_list", "Devices", "DeviceList", "device_list", "Children",
+                "children", "SlaveNodes", "slave_nodes", "AssociatedClients", "Clients", "Nodes", "nodes"
+            ]:
+                children = node.get(key)
+                if isinstance(children, list):
+                    for dev in children:
+                        devices.extend(self._extract_devices_from_topology(dev))
         return devices
 
     async def get_wan_info(self) -> Dict[str, Any]:

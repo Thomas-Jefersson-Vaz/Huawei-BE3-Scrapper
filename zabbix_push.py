@@ -62,6 +62,22 @@ def extract_access_type(device: Dict[str, Any]) -> str:
     return "Unknown"
 
 
+def _is_device_online(d: Dict[str, Any]) -> bool:
+    """Check if a device dictionary represents an active/online device."""
+    for key in ["Active", "IsOnline", "is_online", "online", "OnlineStatus", "Status", "ConnectStatus"]:
+        if key in d:
+            val = d[key]
+            if val is True or val == 1 or val == "1" or str(val).lower() in ("true", "online", "connected"):
+                return True
+            if val is False or val == 0 or val == "0" or str(val).lower() in ("false", "offline", "disconnected"):
+                return False
+
+    # Default to online if MAC or IP is present without explicit offline indicator
+    if d.get("IPAddress") or d.get("MACAddress") or d.get("MacAddress") or d.get("mac"):
+        return True
+    return False
+
+
 class ZabbixPusher:
     """
     Pushes scraped router data to Zabbix via the Trapper protocol.
@@ -122,7 +138,7 @@ class ZabbixPusher:
         ])
 
         # ── Device Count ──────────────────────────────────────────────
-        online_devices = [d for d in devices if d.get("Active") or d.get("IsOnline")]
+        online_devices = [d for d in devices if _is_device_online(d)]
         metrics.append(self._metric("huawei.devices.count", len(online_devices)))
 
         # ── LLD Discovery for Devices ─────────────────────────────────
