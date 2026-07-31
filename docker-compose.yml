@@ -7,6 +7,7 @@ services:
     # If your Zabbix server is on a different network, you can remove this
     # and use the default bridge network instead.
     network_mode: host
+    env_file: stack.env 
     restart: unless-stopped
     logging:
       driver: json-file
