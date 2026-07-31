@@ -65,16 +65,11 @@ def extract_access_type(device: Dict[str, Any]) -> str:
 
 def _is_device_online(d: Dict[str, Any]) -> bool:
     """Check if a device dictionary represents an active/online device."""
-    for key in ["Active", "IsOnline", "is_online", "online", "OnlineStatus", "Status", "ConnectStatus"]:
-        if key in d:
-            val = d[key]
-            if val is True or val == 1 or val == "1" or str(val).lower() in ("true", "online", "connected"):
-                return True
-            if val is False or val == 0 or val == "0" or str(val).lower() in ("false", "offline", "disconnected"):
-                return False
-
-    # Default to online if MAC or IP is present without explicit offline indicator
-    if d.get("IPAddress") or d.get("MACAddress") or d.get("MacAddress") or d.get("mac"):
+    if not isinstance(d, dict):
+        return False
+    mac = (d.get("MACAddress") or d.get("MacAddress") or d.get("mac") or "").strip()
+    ip = (d.get("IPAddress") or d.get("IpAddress") or d.get("ip") or "").strip()
+    if mac or ip:
         return True
     return False
 

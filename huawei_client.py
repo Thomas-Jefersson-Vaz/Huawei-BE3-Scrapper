@@ -16,6 +16,7 @@ import ipaddress
 import json
 import logging
 import re
+import time
 from typing import Any, Dict, List, Optional
 
 import aiohttp
@@ -176,6 +177,8 @@ class HuaweiClient:
         self._lock = asyncio.Lock()
         self._working_host_info_endpoint: Optional[str] = None
         self._working_wan_info_endpoint: Optional[str] = None
+        self._last_known_devices: List[Dict[str, Any]] = []
+        self._last_devices_time: float = 0.0
 
         schema = "https" if use_ssl else "http"
         self._base_url = f"{schema}://{host}:{port}"
@@ -541,8 +544,23 @@ class HuaweiClient:
                 seen_macs.add(mac)
             unique_devices.append(d)
 
-        logger.debug("Found %d total unique devices from API", len(unique_devices))
-        return unique_devices
+        if unique_devices:
+            # Mark all retrieved valid devices active
+            for dev in unique_devices:
+                dev["Active"] = 1
+                dev["IsOnline"] = True
+
+            self._last_known_devices = unique_devices
+            self._last_devices_time = time.time()
+            logger.debug("Found %d total unique devices from API", len(unique_devices))
+            return unique_devices
+
+        # Fallback to cached devices if API momentarily returned empty list / 404
+        if self._last_known_devices and (time.time() - self._last_devices_time < 300):
+            logger.info("API returned empty device list, maintaining last known cached devices (%d devices)", len(self._last_known_devices))
+            return self._last_known_devices
+
+        return []
 
     def _extract_devices_from_topology(self, node: Any) -> List[Dict[str, Any]]:
         """Recursively extract devices from mesh topology JSON."""
