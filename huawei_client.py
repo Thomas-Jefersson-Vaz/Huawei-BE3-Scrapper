@@ -32,6 +32,14 @@ URL_DEVICE_INFO = "api/system/deviceinfo"
 URL_DEVICE_TOPOLOGY = "api/device/topology"
 URL_WANDETECT = "api/ntwk/wandetect"
 
+DEVICE_INFO_ENDPOINTS = [
+    "api/system/deviceinfo",
+    "api/system/device_info",
+    "api/system/HostInfo",
+    "api/system/status",
+    "api/system/information",
+]
+
 # Devices endpoints to try in order
 HOST_INFO_ENDPOINTS = [
     "api/system/HostInfo",
@@ -43,10 +51,66 @@ HOST_INFO_ENDPOINTS = [
 
 # WAN info endpoints to try in order
 WAN_INFO_ENDPOINTS = [
+    "api/ntwk/wandetect",
     "api/ntwk/wan?type=active",
     "api/ntwk/wan_info",
     "api/ntwk/wan",
+    "api/ntwk/wanstatus",
+    "api/ntwk/wan_status",
+    "api/system/waninfo",
 ]
+
+
+def _extract_ip(obj: Any) -> str:
+    """Recursively extract a valid IPv4 address from nested structures."""
+    if not obj:
+        return ""
+    if isinstance(obj, str):
+        val = obj.strip()
+        if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", val) and val != "0.0.0.0":
+            return val
+        return ""
+    if isinstance(obj, dict):
+        # High priority keys first
+        for key in [
+            "ExternalIPAddress", "ExternalIP", "ExternalIp", "WanIP", "WanIp",
+            "IPAddress", "ip_address", "ipv4_address", "wan_ip", "IPv4Address",
+            "IpAddress", "external_ip", "ip"
+        ]:
+            if key in obj:
+                res = _extract_ip(obj[key])
+                if res:
+                    return res
+        for v in obj.values():
+            res = _extract_ip(v)
+            if res:
+                return res
+    elif isinstance(obj, list):
+        for item in obj:
+            res = _extract_ip(item)
+            if res:
+                return res
+    return ""
+
+
+def _extract_version(obj: Any, keys: List[str]) -> str:
+    """Recursively extract version strings from nested dicts using key candidates."""
+    if not obj:
+        return ""
+    if isinstance(obj, str):
+        return obj.strip()
+    if isinstance(obj, dict):
+        for key in keys:
+            if key in obj:
+                val = obj[key]
+                if isinstance(val, str) and val.strip():
+                    return val.strip()
+        for v in obj.values():
+            if isinstance(v, dict):
+                res = _extract_version(v, keys)
+                if res:
+                    return res
+    return ""
 
 
 class AuthenticationError(Exception):
@@ -337,20 +401,74 @@ class HuaweiClient:
 
     async def get_router_info(self) -> Dict[str, Any]:
         """
-        Get router hardware/software information.
+        Get router hardware/software information with fallback endpoints and key discovery.
         """
-        data = await self.get(URL_DEVICE_INFO)
-        if not isinstance(data, dict):
-            return {}
+        data = None
+        for endpoint in DEVICE_INFO_ENDPOINTS:
+            res = await self.get(endpoint)
+            if isinstance(res, dict) and res:
+                data = res
+                logger.debug("Device info endpoint matched: %s", endpoint)
+                break
+
+        if not data:
+            data = {}
+
+        software = _extract_version(data, [
+            "SoftwareVersion", "Software_Version", "ProductSoftwareVersion",
+            "sw_version", "version", "SysVersion", "Software"
+        ])
+
+        harmony = _extract_version(data, [
+            "HarmonyOSVersion", "HarmonyVersion", "harmony_version",
+            "OSVersion", "os_version", "HarmonyOS"
+        ])
+
+        # Fallback HarmonyOS to software version if not separately specified
+        if not harmony and software:
+            harmony = software
+
+        hardware = _extract_version(data, [
+            "HardwareVersion", "Hardware_Version", "hw_version", "Hardware"
+        ])
+
+        serial = _extract_version(data, [
+            "SerialNumber", "serial_number", "SN", "sn", "DeviceSN"
+        ])
+
+        name = (
+            data.get("FriendlyName")
+            or data.get("DeviceName")
+            or _extract_version(data, ["CustDeviceName", "FriendlyName", "DeviceName"])
+            or "Huawei BE3"
+        )
+
+        model = (
+            data.get("custinfo", {}).get("CustDeviceName")
+            if isinstance(data.get("custinfo"), dict)
+            else None
+        ) or data.get("CustDeviceName") or name
+
+        uptime = (
+            data.get("UpTime")
+            or data.get("uptime")
+            or data.get("Uptime")
+            or 0
+        )
+
+        logger.debug(
+            "Extracted router info: model=%s, software=%s, harmonyos=%s, serial=%s",
+            model, software, harmony, serial
+        )
 
         return {
-            "name": data.get("FriendlyName", "Huawei BE3"),
-            "model": data.get("custinfo", {}).get("CustDeviceName", "Huawei BE3"),
-            "serial_number": data.get("SerialNumber", ""),
-            "software_version": data.get("SoftwareVersion", ""),
-            "hardware_version": data.get("HardwareVersion", ""),
-            "harmony_os_version": data.get("HarmonyOSVersion", ""),
-            "uptime": data.get("UpTime", 0),
+            "name": name,
+            "model": model,
+            "serial_number": serial,
+            "software_version": software,
+            "hardware_version": hardware,
+            "harmony_os_version": harmony,
+            "uptime": uptime,
         }
 
     async def get_connected_devices(self) -> List[Dict[str, Any]]:
@@ -408,13 +526,11 @@ class HuaweiClient:
 
     async def get_wan_info(self) -> Dict[str, Any]:
         """
-        Get WAN connection status and bandwidth.
+        Get WAN connection status, external IP, and bandwidth.
         """
         detect_data = await self.get(URL_WANDETECT)
-        if not isinstance(detect_data, dict):
-            detect_data = {}
-
         rate_data = None
+
         endpoints_to_try = (
             [self._working_wan_info_endpoint] + WAN_INFO_ENDPOINTS
             if self._working_wan_info_endpoint
@@ -425,33 +541,40 @@ class HuaweiClient:
             if not endpoint:
                 continue
             res = await self.get(endpoint)
-            if res is not None and isinstance(res, dict):
+            if res is not None:
                 self._working_wan_info_endpoint = endpoint
                 rate_data = res
+                logger.debug("WAN info endpoint matched: %s", endpoint)
                 break
 
-        if not rate_data:
-            rate_data = {}
+        external_ip = _extract_ip(detect_data) or _extract_ip(rate_data)
 
-        external_ip = (
-            detect_data.get("ExternalIPAddress")
-            or detect_data.get("ExternalIP")
-            or detect_data.get("ExternalIp")
-            or detect_data.get("WanIP")
-            or detect_data.get("WanIp")
-            or detect_data.get("IPAddress")
-            or rate_data.get("ExternalIPAddress")
-            or rate_data.get("ExternalIP")
-            or rate_data.get("IPAddress")
-            or ""
-        )
+        connected = False
+        if isinstance(detect_data, dict):
+            connected = detect_data.get("Status") == "Connected" or bool(external_ip)
+        elif external_ip:
+            connected = True
+
+        uptime = 0
+        if isinstance(detect_data, dict):
+            uptime = detect_data.get("Uptime", 0)
+        if not uptime and isinstance(rate_data, dict):
+            uptime = rate_data.get("Uptime", rate_data.get("UpTime", 0))
+
+        upload_rate = 0
+        download_rate = 0
+        if isinstance(rate_data, dict):
+            upload_rate = rate_data.get("UpBandwidth", rate_data.get("UpRate", rate_data.get("UpSpeed", 0)))
+            download_rate = rate_data.get("DownBandwidth", rate_data.get("DownRate", rate_data.get("DownSpeed", 0)))
+
+        logger.debug("Extracted WAN info: connected=%s, external_ip=%s", connected, external_ip)
 
         return {
-            "connected": detect_data.get("Status") == "Connected" or bool(external_ip),
+            "connected": connected,
             "external_ip": external_ip,
-            "uptime": detect_data.get("Uptime", rate_data.get("Uptime", 0)),
-            "upload_rate": rate_data.get("UpBandwidth", rate_data.get("UpRate", 0)),
-            "download_rate": rate_data.get("DownBandwidth", rate_data.get("DownRate", 0)),
+            "uptime": uptime,
+            "upload_rate": upload_rate,
+            "download_rate": download_rate,
         }
 
     async def get_device_topology(self) -> Any:
