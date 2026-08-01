@@ -164,7 +164,8 @@ class ZabbixPusher:
 
         # ── Device Count (Stabilized via TTL Cache) ───────────────────
         online_devices = self.get_active_devices(devices)
-        metrics.append(self._metric("huawei.devices.count", len(online_devices)))
+        device_count = len(online_devices)
+        metrics.append(self._metric("huawei.devices.count", device_count))
 
         # ── LLD Discovery for Devices ─────────────────────────────────
         discovery_data = self._build_lld_discovery(online_devices)
@@ -172,7 +173,7 @@ class ZabbixPusher:
 
         # ── Per-Device Metrics ────────────────────────────────────────
         for device in online_devices:
-            mac = device.get("MACAddress", "").upper().replace(":", "").replace("-", "")
+            mac = (device.get("MACAddress") or device.get("MacAddress") or device.get("mac") or "").upper().replace(":", "").replace("-", "")
             if not mac:
                 continue
             hostname = extract_hostname(device, mac)

@@ -58,13 +58,13 @@ def get_client_proof(
     auth_msg = first_nonce + "," + server_nonce + "," + server_nonce
 
     client_key = hmac.new(
-        "Client Key".encode("utf-8"), salted_password, hashlib.sha256
+        salted_password, "Client Key".encode("utf-8"), hashlib.sha256
     ).digest()
 
     stored_key = hashlib.sha256(client_key).digest()
 
     client_signature = hmac.new(
-        auth_msg.encode("utf-8"), stored_key, hashlib.sha256
+        stored_key, auth_msg.encode("utf-8"), hashlib.sha256
     ).digest()
 
     client_proof = bytes(

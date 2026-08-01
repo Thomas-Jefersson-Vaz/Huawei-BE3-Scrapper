@@ -69,8 +69,11 @@ async def scrape_cycle(client: HuaweiClient, pusher: ZabbixPusher) -> bool:
             client.get_connected_devices(),
         )
 
-        # Stabilized active devices count
-        online = pusher.get_active_devices(devices)
+        # Push to Zabbix (push_all handles TTL-stabilized device counting internally)
+        success = pusher.push_all(router_info, wan_info, devices)
+
+        # Log summary using stabilized device list from the cache
+        online = [info["data"] for info in pusher._device_cache.values()]
 
         logger.info(
             "📡 Scraped: router=%s | WAN=%s (%s) | ↑%.1f KB/s ↓%.1f KB/s | %d devices online",
@@ -89,8 +92,6 @@ async def scrape_cycle(client: HuaweiClient, pusher: ZabbixPusher) -> bool:
             mac = device.get("MACAddress", "?")
             logger.debug("  └─ %s (%s) [%s]", hostname, ip, mac)
 
-        # Push to Zabbix
-        success = pusher.push_all(router_info, wan_info, devices)
         return success
 
     except AuthenticationError as e:

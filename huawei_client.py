@@ -344,8 +344,11 @@ class HuaweiClient:
     ) -> aiohttp.ClientResponse:
         """Perform a raw POST request with JSON body."""
         url = f"{self._base_url}/{path}"
+        req_headers = {"Content-Type": "application/json"}
+        if headers:
+            req_headers.update(headers)
         return await self._session.post(
-            url, data=json.dumps(data), ssl=False, headers=headers
+            url, data=json.dumps(data), ssl=False, headers=req_headers
         )
 
     @staticmethod
